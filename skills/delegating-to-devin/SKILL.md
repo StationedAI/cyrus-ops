@@ -13,18 +13,20 @@ Devin is a cloud software agent with its own VM and access to the HGDWAPP/hgdw-l
 
 Do NOT delegate small mechanical fixes — implement those yourself.
 
-## Plan-with-Devin workflow (labeled issues)
-Devin owns repo investigation AND planning. Do NOT do your own repo recon first — delegate immediately and let Devin read the codebase on its own machine (it has repo access).
-1. Create the Devin session with the full ticket verbatim:
+## Plan-with-Devin workflow (labeled issues): competitive planning
+Two independent plans are produced, then the strongest wins. Devin reads the repo on its own machine (it has repo access + provisioned credentials) — do not feed it your findings; independence is the point.
+1. Kick off the Devin planning session FIRST (so it runs while you work), with the full ticket verbatim:
    ```bash
    devin new "Plan only, do not write code or open PRs. Investigate the HGDWAPP/hgdw-lms repo yourself first: find what already exists that is relevant (tables, flows, migrations, prior PRs) — do not assume greenfield. Ticket <issue-id>: <full title + description + relevant comments>. Deliver: repo findings, then a step-by-step implementation plan with file paths, migration steps, and test strategy." --title "Plan: <issue-id>"
    ```
-2. `devin wait <session_id> 2700`, then `devin messages <session_id>` to get the plan.
-3. **Post Devin's full plan as a comment on the Linear issue** (include the Devin session URL), clearly marked as "Plan from Devin".
-4. Implement against that plan and open the PR. If during implementation the repo contradicts the plan, note the discrepancy in a comment and ask Devin (`devin send`) or flag it for the requester rather than silently diverging.
+2. While Devin works, write YOUR OWN plan from your own repo investigation. Do not look at Devin's output before yours is done.
+3. `devin wait <session_id> 2700`, then `devin messages <session_id>` to get Devin's plan.
+4. **Assess both plans** against the repo reality: correctness of assumptions, coverage of edge cases/migrations/RLS, test strategy, risk. Pick the stronger one as the base and fold in anything the other caught that it missed.
+5. **Post to the Linear issue**: the canonical (merged) plan, a short assessment of the two plans (what each got right/missed), and the Devin session URL.
+6. Implement against the canonical plan and open the PR. If during implementation the repo contradicts the plan, note the discrepancy in a comment and ask Devin (`devin send`) or flag it for the requester rather than silently diverging.
 
-## Testing with Devin
-Devin is excellent at end-to-end testing. After you open a PR for a non-trivial change (or when the issue asks for verification), you may create a Devin session to test it:
+## Testing with Devin (mandatory for non-trivial PRs)
+Devin is the designated tester: its VM has the full environment and all credentials provisioned. After you open a PR for any non-trivial change (and always when the issue has a `devin-test` label or asks for verification), create a Devin testing session:
 ```bash
 devin new "Test PR <url> on HGDWAPP/hgdw-lms: check out the branch, run the test suite, and exercise the changed behavior end-to-end with real assertions (no stub checks, no visual-only verification). Report the derived contract, failure modes covered, and pasted actual test output; list anything unverified and why. Do not push changes." --title "Test: <issue-id>"
 ```
