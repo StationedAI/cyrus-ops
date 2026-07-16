@@ -8,13 +8,14 @@
       "workspaceBaseDir": "/Users/atomicgtmlab/.cyrus/worktrees",
       "linearWorkspaceId": "e9dd6021-0b9b-4c1b-a25c-263dfbba63bb",
       "isActive": true,
-      "githubUrl": "https://github.com/HGDWAPP/hgdw-lms"
+      "githubUrl": "https://github.com/HGDWAPP/hgdw-lms",
+      "appendInstruction": "MANDATORY RULE: if the Linear issue has a plan-with-devin or devin label, you MUST use the delegating-to-devin skill (~/.claude/skills/delegating-to-devin/SKILL.md): as your FIRST action kick off a Devin planning session via the devin CLI (/opt/homebrew/bin/devin), then write your own independent plan while Devin works, then assess both plans and post the canonical merged plan to the Linear issue with the Devin session URL. Do not skip this even if you could plan alone. For non-trivial PRs (or a devin-test label) you MUST create a Devin testing session per that skill."
     }
   ],
   "linearWorkspaces": {
     "e9dd6021-0b9b-4c1b-a25c-263dfbba63bb": {
-      "linearToken": "<injected by `cyrus self-auth-linear` — do not commit>",
-      "linearRefreshToken": "<injected by `cyrus self-auth-linear` — do not commit>",
+      "linearToken": "<injected by `cyrus self-auth-linear` \u2014 do not commit>",
+      "linearRefreshToken": "<injected by `cyrus self-auth-linear` \u2014 do not commit>",
       "linearWorkspaceName": "StationedAI",
       "linearWorkspaceSlug": "stationedai"
     }
