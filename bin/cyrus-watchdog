@@ -25,10 +25,12 @@ alert() {
 }
 
 # 1. Process/endpoint health + auto-restart
-if ! launchctl list | grep -q com.cyrus.agent; then
+# (capture first: `grep -q` + pipefail causes SIGPIPE false negatives)
+services=$(launchctl list)
+if ! echo "$services" | grep -q com.cyrus.agent; then
   alert "Cyrus service not loaded — reloading"
   launchctl load "$HOME/Library/LaunchAgents/com.cyrus.agent.plist"
-elif ! curl -s -m 5 http://localhost:3456/status | grep -q status; then
+elif status_out=$(curl -s -m 5 http://localhost:3456/status || true); ! echo "$status_out" | grep -q status; then
   alert "Cyrus /status unresponsive — restarting service"
   launchctl kickstart -k "gui/$(id -u)/com.cyrus.agent"
 fi
