@@ -1,0 +1,22 @@
+{
+  "repositories": [
+    {
+      "id": "d25c6e1d-b84c-473d-81ea-be6c3415ab07",
+      "name": "hgdw-lms",
+      "repositoryPath": "/Users/atomicgtmlab/.cyrus/repos/hgdw-lms",
+      "baseBranch": "staging",
+      "workspaceBaseDir": "/Users/atomicgtmlab/.cyrus/worktrees",
+      "linearWorkspaceId": "e9dd6021-0b9b-4c1b-a25c-263dfbba63bb",
+      "isActive": true,
+      "githubUrl": "https://github.com/HGDWAPP/hgdw-lms"
+    }
+  ],
+  "linearWorkspaces": {
+    "e9dd6021-0b9b-4c1b-a25c-263dfbba63bb": {
+      "linearToken": "<injected by `cyrus self-auth-linear` — do not commit>",
+      "linearRefreshToken": "<injected by `cyrus self-auth-linear` — do not commit>",
+      "linearWorkspaceName": "StationedAI",
+      "linearWorkspaceSlug": "stationedai"
+    }
+  }
+}
