@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# cyrus-watchdog — health check + auto-retry + Slack alerting for Cyrus.
+# Run every 2 min via launchd (com.cyrus.watchdog.plist).
+#  - Restarts the Cyrus service if the process or /status endpoint is down.
+#  - Scans cyrus logs for new session failures since the last run and alerts Slack.
+set -uo pipefail
+
+CYRUS_HOME="$HOME/.cyrus"
+STATE="$CYRUS_HOME/watchdog.state"
+LOG="$CYRUS_HOME/watchdog.log"
+SLACK_WEBHOOK="${CYRUS_SLACK_WEBHOOK:-}"
+[ -f "$CYRUS_HOME/.env" ] && SLACK_WEBHOOK="${SLACK_WEBHOOK:-$(grep -E '^CYRUS_SLACK_WEBHOOK=' "$CYRUS_HOME/.env" | cut -d= -f2-)}"
+
+ts() { date '+%Y-%m-%dT%H:%M:%S'; }
+note() { echo "$(ts) $*" >> "$LOG"; }
+
+alert() {
+  local msg="$1"
+  note "ALERT: $msg"
+  if [ -n "$SLACK_WEBHOOK" ]; then
+    curl -s -m 10 -X POST -H 'Content-Type: application/json' \
+      -d "$(python3 -c 'import json,sys;print(json.dumps({"text":sys.argv[1]}))' "cyrus-watchdog: $msg")" \
+      "$SLACK_WEBHOOK" >/dev/null || note "slack alert failed"
+  fi
+}
+
+# 1. Process/endpoint health + auto-restart
+if ! launchctl list | grep -q com.cyrus.agent; then
+  alert "Cyrus service not loaded — reloading"
+  launchctl load "$HOME/Library/LaunchAgents/com.cyrus.agent.plist"
+elif ! curl -s -m 5 http://localhost:3456/status | grep -q status; then
+  alert "Cyrus /status unresponsive — restarting service"
+  launchctl kickstart -k "gui/$(id -u)/com.cyrus.agent"
+fi
+
+# 2. New session failures since last scan
+touch "$STATE"
+last_line=$(cat "$STATE" 2>/dev/null || echo 0); last_line=${last_line:-0}
+total=$(wc -l < "$CYRUS_HOME/cyrus.log" | tr -d ' ')
+if [ "$total" -lt "$last_line" ]; then last_line=0; fi  # log rotated/truncated
+new_failures=$(sed -n "$((last_line+1)),\$p" "$CYRUS_HOME/cyrus.log" | \
+  grep -iE 'session (failed|error)|Failed to (start|create|authenticate)|error_max_turns|subtype: error' | tail -5)
+echo "$total" > "$STATE"
+if [ -n "$new_failures" ]; then
+  alert "session failure(s) detected:
+$new_failures
+Tip: comment '@cyrus retry' on the affected Linear issue."
+fi
