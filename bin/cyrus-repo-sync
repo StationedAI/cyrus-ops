@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# cyrus-repo-sync — keep Cyrus's base clones fresh so every new worktree/session
+# starts from the team's latest code. Run periodically via launchd.
+set -euo pipefail
+for repo in "$HOME"/.cyrus/repos/*/; do
+  [ -d "$repo/.git" ] || continue
+  git -C "$repo" fetch origin --prune --quiet || continue
+  current=$(git -C "$repo" branch --show-current)
+  # Fast-forward the checked-out branch and mirror all remote branches locally
+  # (Cyrus creates worktrees from local refs).
+  if [ -n "$current" ]; then
+    git -C "$repo" merge --ff-only "origin/$current" --quiet 2>/dev/null || true
+  fi
+  for b in $(git -C "$repo" for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -v HEAD); do
+    local_b=${b#origin/}
+    [ "$local_b" = "$current" ] && continue
+    git -C "$repo" branch -f "$local_b" "$b" 2>/dev/null || true
+  done
+done
