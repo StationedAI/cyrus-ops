@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# cyrus-ops-deploy — auto-deploy cyrus-ops on merge to main.
+# Polls the cyrus-ops repo; when origin/main moves, installs config/skills/bin
+# and reloads Cyrus. Run every 2 min via launchd (com.cyrus.opsdeploy.plist).
+set -uo pipefail
+
+OPS="$HOME/.cyrus/ops"
+REPO_URL="https://github.com/StationedAI/cyrus-ops.git"
+LOG="$HOME/.cyrus/opsdeploy.log"
+note() { echo "$(date '+%Y-%m-%dT%H:%M:%S') $*" >> "$LOG"; }
+
+if [ ! -d "$OPS/.git" ]; then
+  git clone --quiet "$REPO_URL" "$OPS" || { note "clone failed"; exit 1; }
+  note "initial clone"
+fi
+
+cd "$OPS"
+git fetch origin --quiet || { note "fetch failed"; exit 1; }
+local_sha=$(git rev-parse HEAD)
+remote_sha=$(git rev-parse origin/main)
+[ "$local_sha" = "$remote_sha" ] && exit 0
+
+# Don't restart mid-session: defer deploy while Cyrus is busy.
+status=$(curl -s -m 5 http://localhost:3456/status || true)
+if echo "$status" | grep -q busy; then
+  note "update available ($remote_sha) but cyrus busy — deferring"
+  exit 0
+fi
+
+note "deploying $remote_sha (was $local_sha)"
+git reset --hard origin/main --quiet
+
+# 1. Executables
+for f in bin/*; do
+  [ -f "$f" ] || continue
+  install -m 0755 "$f" "/opt/homebrew/bin/$(basename "$f")"
+done
+
+# 2. Skills → Cyrus user-skills plugin
+if [ -d skills ]; then
+  mkdir -p "$HOME/.cyrus/user-skills-plugin/skills"
+  cp -R skills/* "$HOME/.cyrus/user-skills-plugin/skills/"
+fi
+
+# 3. launchd plists (reload only if changed)
+for p in launchd/*.plist; do
+  [ -f "$p" ] || continue
+  dest="$HOME/Library/LaunchAgents/$(basename "$p")"
+  if ! cmp -s "$p" "$dest"; then
+    cp "$p" "$dest"
+    launchctl unload "$dest" 2>/dev/null
+    launchctl load "$dest"
+    note "reloaded $(basename "$p")"
+  fi
+done
+
+# 4. Merge non-secret config fields (appendInstruction, model, labelPrompts, routing)
+python3 - <<'EOF' >> "$LOG" 2>&1
+import json, os
+home = os.path.expanduser("~")
+live_p = f"{home}/.cyrus/config.json"
+tmpl_p = f"{home}/.cyrus/ops/config/config.template.json"
+live, tmpl = json.load(open(live_p)), json.load(open(tmpl_p))
+fields = ["appendInstruction","model","fallbackModel","labelPrompts","allowedTools",
+          "disallowedTools","baseBranch","routingLabels","teamKeys","projectKeys","promptTemplatePath"]
+by_name = {r.get("name"): r for r in tmpl.get("repositories", [])}
+changed = False
+for repo in live.get("repositories", []):
+    t = by_name.get(repo.get("name"))
+    if not t:
+        continue
+    for f in fields:
+        if f in t and repo.get(f) != t[f]:
+            repo[f] = t[f]; changed = True
+        elif f not in t and f in repo and f in ("appendInstruction","labelPrompts"):
+            del repo[f]; changed = True
+if changed:
+    json.dump(live, open(live_p, "w"), indent=2)
+    print("config merged")
+EOF
+
+# 5. Restart Cyrus to pick everything up
+launchctl kickstart -k "gui/$(id -u)/com.cyrus.agent"
+note "deployed $remote_sha and restarted cyrus"
