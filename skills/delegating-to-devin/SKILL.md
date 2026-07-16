@@ -7,7 +7,7 @@ description: Delegate planning, review, or complex implementation work to Devin 
 
 Devin is a cloud software agent with its own VM and access to the HGDWAPP/hgdw-lms repo. A `devin` CLI is installed at /opt/homebrew/bin/devin (auth is preconfigured via ~/.cyrus/.env).
 
-**IMPORTANT — GitHub access**: Devin's native GitHub integration does not cover the HGDWAPP org, but a GitHub PAT is provisioned in its secrets. Every prompt you send that involves the repo MUST include this line: "Your GitHub integration cannot access HGDWAPP; use the GitHub PAT from your provisioned secrets (JADAN_GH_PAT or similar) to clone: git clone https://x-access-token:$PAT@github.com/HGDWAPP/hgdw-lms.git"
+**IMPORTANT — repo access**: every prompt you send that involves a repository MUST include a general access note like: "If your GitHub integration cannot access the repo, check your provisioned secrets for a GitHub credential (e.g. GH_PAT) and use standard HTTPS token authentication to clone." Keep it general — describe the method, don't demand a specific secret name.
 
 ## When to delegate
 - **MANDATORY**: the issue has a `plan-with-devin` or `devin` label, or the requester asks for Devin. On these issues you MUST delegate planning to Devin — even if you believe you could plan it yourself. This is a hard rule, not a judgment call.
@@ -19,7 +19,7 @@ Do NOT delegate small mechanical fixes — implement those yourself.
 Two independent plans are produced, then the strongest wins. Devin reads the repo on its own machine (it has repo access + provisioned credentials) — do not feed it your findings; independence is the point.
 1. Kick off the Devin planning session FIRST (so it runs while you work), with the full ticket verbatim:
    ```bash
-   devin new "Plan only, do not write code or open PRs. Investigate the HGDWAPP/hgdw-lms repo yourself first (clone with your provisioned GitHub PAT as noted above): find what already exists that is relevant (tables, flows, migrations, prior PRs) — do not assume greenfield. Ticket <issue-id>: <full title + description + relevant comments>. Deliver: repo findings, then a step-by-step implementation plan with file paths, migration steps, and test strategy." --title "Plan: <issue-id>"
+   devin new "Plan only, do not write code or open PRs. Investigate the HGDWAPP/hgdw-lms repo yourself first (if your integration lacks access, use a provisioned GitHub credential with HTTPS token auth): find what already exists that is relevant (tables, flows, migrations, prior PRs) — do not assume greenfield. Ticket <issue-id>: <full title + description + relevant comments>. Deliver: repo findings, then a step-by-step implementation plan with file paths, migration steps, and test strategy." --title "Plan: <issue-id>"
    ```
 2. While Devin works, write YOUR OWN plan from your own repo investigation. Do not look at Devin's output before yours is done.
 3. `devin wait <session_id> 2700`, then `devin messages <session_id>` to get Devin's plan.
