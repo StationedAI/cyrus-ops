@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# cyrus-autoassign — assign unassigned Sentry-created Linear issues to Cyrus.
+# Substitutes for Linear's Business-plan triage responsibility feature.
+# Run every 2 min via launchd (com.cyrus.autoassign.plist).
+set -uo pipefail
+
+LOG="$HOME/.cyrus/autoassign.log"
+ENV_FILE="$HOME/.cyrus/.env"
+LINEAR_API_KEY="${LINEAR_API_KEY:-$(grep -E '^LINEAR_API_KEY=' "$ENV_FILE" | cut -d= -f2-)}"
+CYRUS_USER_ID="66ce3498-0f85-45cc-b226-7c451743ef82"
+TEAM_ID="150ca5e8-2af6-4b39-9832-96a8cb563114"
+[ -z "$LINEAR_API_KEY" ] && { echo "$(date '+%FT%T') no LINEAR_API_KEY" >> "$LOG"; exit 1; }
+
+python3 - "$LINEAR_API_KEY" "$CYRUS_USER_ID" "$TEAM_ID" >> "$LOG" 2>&1 <<'EOF'
+import json, sys, urllib.request, datetime
+key, cyrus, team = sys.argv[1:4]
+
+def gql(query, variables=None):
+    req = urllib.request.Request(
+        "https://api.linear.app/graphql",
+        data=json.dumps({"query": query, "variables": variables or {}}).encode(),
+        headers={"Authorization": key, "Content-Type": "application/json"})
+    return json.loads(urllib.request.urlopen(req, timeout=30).read())
+
+# Unassigned, unstarted issues on the team created by the Sentry integration
+r = gql("""query($team: ID!) {
+  issues(first: 50, filter: {
+    team: {id: {eq: $team}},
+    assignee: {null: true},
+    state: {type: {in: ["triage","backlog","unstarted"]}}
+  }) { nodes { id identifier title creator { name } botActor { name }
+               labels { nodes { name } } attachments { nodes { url } } } }
+}""", {"team": team})
+
+for issue in r["data"]["issues"]["nodes"]:
+    creator = (issue.get("creator") or {}).get("name") or ""
+    bot = (issue.get("botActor") or {}).get("name") or ""
+    labels = [l["name"].lower() for l in issue["labels"]["nodes"]]
+    urls = " ".join(a["url"] for a in issue["attachments"]["nodes"])
+    if not ("sentry" in creator.lower() or "sentry" in bot.lower()
+            or "sentry" in labels or "sentry.io" in urls):
+        continue
+    res = gql("""mutation($id: String!, $assignee: String!) {
+      issueUpdate(id: $id, input: {assigneeId: $assignee}) { success }
+    }""", {"id": issue["id"], "assignee": cyrus})
+    ok = res.get("data", {}).get("issueUpdate", {}).get("success")
+    print(f"{datetime.datetime.now().isoformat()} assigned {issue['identifier']} to Cyrus: {ok}")
+EOF
