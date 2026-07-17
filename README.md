@@ -15,6 +15,7 @@ Cyrus connects Linear to Claude Code: assign a Linear issue to Cyrus (or @mentio
 | `skills/delegating-to-devin/SKILL.md` | Claude skill so Cyrus can delegate planning/complex work to Devin (install to `~/.claude/skills/`) |
 | `docs/RUNBOOK.md` | Operations: deploy, add a repo, troubleshoot, known failure modes |
 | `docs/OBSERVABILITY.md` | Logs, OpenTelemetry tracing, and behavior control |
+| `zo/` | **Zo — Team Orchestrator**: Zo Computer as the team's Slack orchestrator, with Cyrus running directly on the Zo server (persona, rules, skills, runbooks — see `zo/README.md`) |
 
 ## Architecture
 
