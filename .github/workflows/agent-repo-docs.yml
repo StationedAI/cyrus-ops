@@ -23,7 +23,7 @@ jobs:
 
       - name: Generate repo map
         run: |
-          python3 .github/scripts/repo-map.py . --max-lines 1200 > /tmp/repo-map.md
+          python3 .github/scripts/repo-map.py . --max-lines 2000 > /tmp/repo-map.md
           wc -l /tmp/repo-map.md
 
       - uses: anthropics/claude-code-action@v1
