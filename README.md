@@ -33,3 +33,14 @@ Sentry ──alert rule──▶ Linear (StationedAI)
 ## Multi-repo
 
 Each entry in `config.json`'s `repositories[]` is independent: its own clone, base branch, GitHub URL, and routing (team keys / project keys / labels; a repo without `routingLabels` acts as catch-all). Per-repo behavior comes from that repo's own `AGENTS.md` / `CLAUDE.md`. See `docs/RUNBOOK.md#adding-a-repository`.
+
+## Zo fleet
+
+The team's production Cyrus instances (cyrus-atomic / cyrus-hgdw /
+cyrus-general) run on the Zo server, delegated to via
+`zo-orchestrator/scripts/delegate.py` — which handles channel→instance
+billing routing, a **model router** (auto haiku/sonnet/opus per issue;
+codex/kimi lanes when the instance `.env` has their credential), repo
+auto-onboarding, and PR-review Action auto-provisioning. The **workers**
+repo is the system record for that fleet; this repo keeps the Cyrus
+templates and runbooks.
