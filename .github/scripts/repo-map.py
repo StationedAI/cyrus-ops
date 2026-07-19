@@ -18,7 +18,10 @@ SKIP_DIRS = {
     ".git", "node_modules", ".next", "dist", "build", "out", "coverage",
     "__pycache__", ".venv", "venv", ".turbo", ".vercel", "vendor",
 }
-EXTS = {".ts", ".tsx", ".js", ".jsx", ".py", ".sql", ".rb", ".go", ".rs"}
+EXTS = {
+    ".ts", ".tsx", ".js", ".jsx", ".py", ".sql", ".rb", ".go", ".rs",
+    ".sh", ".md", ".yml", ".yaml",
+}
 
 PATTERNS = [
     # ts/js exports
@@ -37,6 +40,10 @@ PATTERNS = [
     ),
     # go/rust
     re.compile(r"^(?:pub\s+)?(fn|func|struct|impl|trait)\s+([A-Za-z0-9_]+)"),
+    # shell functions
+    re.compile(r"^(?:(function)\s+)?([A-Za-z0-9_]+)\(\)\s*\{"),
+    # markdown h2 headings (doc section index)
+    re.compile(r"^(##)\s+(.{1,60}?)\s*$"),
 ]
 
 
@@ -51,7 +58,9 @@ def symbols(path):
                 for pat in PATTERNS:
                     m = pat.match(line)
                     if m:
-                        out.append(f"{m.group(1).lower()} {m.group(2)}")
+                        kind = (m.group(1) or "fn").lower()
+                        kind = "\u00a7" if kind == "##" else kind
+                        out.append(f"{kind} {m.group(2)}")
                         break
     except OSError:
         pass
@@ -71,7 +80,8 @@ def main():
             d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")
         )
         for fn in sorted(filenames):
-            if os.path.splitext(fn)[1] not in EXTS:
+            ext = os.path.splitext(fn)[1]
+            if ext not in EXTS and ext != "":
                 continue
             full = os.path.join(dirpath, fn)
             rel = os.path.relpath(full, root)
