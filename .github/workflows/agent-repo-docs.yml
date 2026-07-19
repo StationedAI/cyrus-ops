@@ -1,0 +1,64 @@
+# Auto-maintained repo docs (OpenWiki pattern): keeps docs/AGENT-CONTEXT.md
+# current so coding/review agents don't rediscover the architecture each run.
+# Copy to .github/workflows/agent-repo-docs.yml in each repo and add the
+# CLAUDE_CODE_OAUTH_TOKEN repo secret. Opens a PR only when the doc drifted.
+name: Agent repo docs
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate repo map
+        run: |
+          python3 .github/scripts/repo-map.py . --max-lines 1200 > /tmp/repo-map.md
+          wc -l /tmp/repo-map.md
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Maintain docs/AGENT-CONTEXT.md — the repo's agent-facing context
+            doc. It must let a coding agent start work without re-exploring
+            the codebase:
+
+            If the repo has an AGENTS.md, keep conventions there (do not
+            duplicate) — AGENT-CONTEXT.md then just links to it and carries
+            the parts AGENTS.md lacks plus the repo map.
+
+            1. Purpose (2-3 sentences) and key technologies.
+            2. Top-level structure: each significant directory + what lives
+               there.
+            3. Key domain concepts and their relationships.
+            4. Conventions: how migrations are added, how tests run, lint/
+               typecheck commands, branch/PR conventions.
+            5. Gotchas: things that repeatedly bite agents (check recent PR
+               review comments and reverted commits for evidence).
+
+            6. End the file with the generated repo map from /tmp/repo-map.md
+               verbatim (replace any previous "## Repo map" section — it is
+               machine-generated each run).
+
+            Read the current file (create it if missing), compare against the
+            codebase as it is NOW, and rewrite ONLY what drifted in sections
+            1-5. Keep sections 1-5 under 200 lines, terse, factual.
+
+            If nothing changed, do nothing and exit. Otherwise: create branch
+            agent-docs/<today's date>, commit the update, push, and open a PR
+            titled "docs: refresh agent context" using `gh pr create`,
+            summarizing what drifted.
+          claude_args: '--allowed-tools "Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Read,Write,Edit,Grep,Glob"'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
