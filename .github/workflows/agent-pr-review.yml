@@ -1,0 +1,57 @@
+# Automated PR review (OpenSWE-Review-style, on our own billing).
+# Copy to .github/workflows/agent-pr-review.yml in each repo and add the
+# CLAUDE_CODE_OAUTH_TOKEN repo secret (the instance's Claude account token).
+name: Agent PR review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Review this pull request (#${{ github.event.pull_request.number }})
+            as a careful senior engineer. Post ONE review comment on the PR via
+            `gh pr comment` (do not approve/reject).
+
+            Mechanical checks (flag as BLOCKER if violated):
+            - Head commit author must be a real team member
+              (<ghuser>@users.noreply.github.com), not a bot identity —
+              deploys reject non-member authors.
+            - SQL migrations must be idempotent (no bare ADD CONSTRAINT;
+              use DO-block information_schema guards) and must not drop
+              data without an explicit note.
+            - No secrets, tokens, or .env contents in the diff.
+            - New dependencies must be pinned (no `latest`/`*`).
+
+            Code review (flag as ISSUE or NIT by severity):
+            - Bugs, regressions, unhandled error paths introduced by the diff.
+            - Violations of the repo's existing conventions (check
+              neighboring files).
+            - Missing updates to callers/types when interfaces change.
+
+            Structure the comment: verdict line
+            (LGTM / ISSUES FOUND / BLOCKERS), then bullet findings, each with
+            file:line. Stay quiet on style preferences. Be terse.
+          claude_args: '--allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
